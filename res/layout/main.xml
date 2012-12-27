@@ -3,7 +3,11 @@
 	android:layout_width="fill_parent"
 	android:layout_height="fill_parent">
 	
-	<dev.eguy.android.CustomView android:id="@+id/cView" android:layout_width="fill_parent"
-	android:layout_height="fill_parent" />
-	
+	<dev.eguy.android.CustomView 
+	android:id="@+id/cView" 
+	android:layout_width="fill_parent"
+	android:layout_height="fill_parent"
+	android:keepScreenOn="true" >
+	</dev.eguy.android.CustomView>	
+<TextView android:text="@+id/ScoreTextView" android:id="@+id/ScoreTextView" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
 </FrameLayout>

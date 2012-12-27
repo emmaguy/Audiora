@@ -1,95 +1,130 @@
 package dev.eguy.android;
 
-import java.util.LinkedList;
-import java.util.Random;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 
 public class ParticleSys
 {
-	enum Direction { N, NE, E, SE, S, SW, W, NW };
-
-	class Particle
+	// particles in the explosion
+	private Particle[] m_particles;						
+	private int m_numDeadParticles = 0;
+	
+	public ParticleSys(int particleNr, float xLocation, float yLocation) 
 	{
-		public int XVal;
-		public int YVal;
-		public Direction Direction;
+		this.m_particles = new Particle[particleNr];
+		int colour = Color.argb(255, GlobalHelpers.GetNextRand(255), GlobalHelpers.GetNextRand(255), GlobalHelpers.GetNextRand(255));
+	 	for (int i = 0; i < this.m_particles.length; i++) 
+	 	{
+			Particle p = new Particle(xLocation, yLocation, colour);
+			this.m_particles[i] = p;
+		}
 	}
 	
-	private final int NUM_PARTICLES = 100;
-	private int m_timeToLive = 25;
-	private LinkedList<Particle> m_particles = new LinkedList<Particle>();
-	
-	public ParticleSys(int x, int y)
+	public void DrawAndUpdateParticles(Canvas canvas)
 	{
-		Direction[] directions = Direction.values();
-		int numDirections = directions.length;
-		int currentDir = 0;
-		int currentDirIndex = 0;
-		int numParticlesPerDirection = NUM_PARTICLES / numDirections;
-		
-		for (int i = 0; i < NUM_PARTICLES; i++)
+		for (ParticleSys.Particle x : this.m_particles)
 		{
-			Particle newParticle = new Particle();
-			newParticle.XVal = x;
-			newParticle.YVal = y;
-			newParticle.Direction = directions[currentDirIndex];
-			m_particles.add(newParticle);
+			x.Draw(canvas);
+			if (x.Update())
+				m_numDeadParticles++;
+		}
+	}
+	
+	// are all the particles dead
+	public boolean IsDeceased()
+	{
+		return m_numDeadParticles >= m_particles.length;
+	}
 
-			currentDir++;
+	enum State { Alive, Dead };
+	
+	public class Particle 
+	{	
+		private static final int DEFAULT_LIFETIME 	= 150;
+		
+		// amount to fade by
+		private static final int NUM_FADE = 10;
+		
+		// max width/height
+		private static final int MAX_DIMENSION		= 3;
+		
+		// maximum speed (per update)
+		private static final int MAX_SPEED			= 4;	
 
-			if (currentDir >= numParticlesPerDirection)
+		private State m_state;		// particle is alive or dead
+		private float m_width;		// width of the particle
+		private float m_height;		// height of the particle
+		private float m_xLoc, m_yLoc;			// horizontal and vertical position
+		private double m_xVel, m_yVel;		// vertical and horizontal velocity
+		private int m_age;			// current age of the particle
+		private int m_lifetime;		// particle dies when it reaches this value
+		private int m_colour;			// the colour of the particle
+		private Paint m_paint;		// internal use to avoid instantiation
+		
+		public Particle(float xLocation, float yLocation, int colour) 
+		{		
+			this.m_xLoc = xLocation;
+			this.m_yLoc = yLocation;
+			this.m_state = State.Alive;
+			this.m_width = GlobalHelpers.GetNextRand(MAX_DIMENSION) + 1;
+			this.m_height = this.m_width;
+			this.m_lifetime = DEFAULT_LIFETIME;
+			this.m_age = 0;
+			this.m_xVel= GlobalHelpers.GetNextRandDbl(MAX_SPEED * 2) - MAX_SPEED;
+			this.m_yVel = GlobalHelpers.GetNextRandDbl(MAX_SPEED * 2) - MAX_SPEED;
+			
+			// smoothing out the diagonal speed
+			if (m_xVel * m_xVel + m_yVel * m_yVel > MAX_SPEED * MAX_SPEED) 
 			{
-				currentDir = 0;
-				currentDirIndex++;
+				m_xVel *= 0.7;
+				m_yVel *= 0.7;
+			}
+			this.m_colour = colour;
+			this.m_paint = new Paint(this.m_colour);
+			this.m_paint.setColor(this.m_colour);
+		}
+
+		public boolean Update() 
+		{
+			if (this.m_state != State.Dead) 
+			{
+				this.m_xLoc += this.m_xVel;
+				this.m_yLoc += this.m_yVel;
+
+				// extract alpha
+				int a = this.m_colour >>> 24;
+				a -= NUM_FADE;
 				
-				if (currentDirIndex >= numDirections)
+				if (a <= 0) 
+				{ 
+					// if reached transparency kill the particle
+					this.m_state = State.Dead;
+					return true;
+				} 
+				else 
 				{
-					// wrap back to 0 so we're not out of range
-					currentDirIndex = 0;
+					// set the new alpha
+					this.m_colour = (this.m_colour & 0x00ffffff) + (a << 24);		
+					this.m_paint.setAlpha(a);
+					
+					// increase the age of the particle
+					this.m_age++; 
+				}
+				// reached the end if its life
+				if (this.m_age >= this.m_lifetime) 
+				{	
+					this.m_state = State.Dead;
+					return true;
 				}
 			}
-		}
-	}
-	
-	private int GetDistanceToMove(Random ran)
-	{
-		 return 1 + ran.nextInt(3);
-	}
-	
-	public void MoveParticles()
-	{
-		Random ran = new Random();
-		
-		for(int i = 0; i < m_particles.size(); i++)
-		{
-			Particle p = m_particles.get(i);
 			
-			if(p.Direction == Direction.N || p.Direction == Direction.NE || p.Direction == Direction.NW)
-			{
-				p.XVal += GetDistanceToMove(ran);
-			}
-			if(p.Direction == Direction.S || p.Direction == Direction.SW || p.Direction == Direction.SE)
-			{
-				p.XVal -= GetDistanceToMove(ran);
-			}
-			if(p.Direction == Direction.E || p.Direction == Direction.NE || p.Direction == Direction.SE)
-			{
-				p.YVal += GetDistanceToMove(ran);;
-			}
-			if(p.Direction == Direction.W || p.Direction == Direction.NW || p.Direction == Direction.SW)
-			{
-				p.YVal -= GetDistanceToMove(ran);;
-			}
+			return false;
 		}
-		
-		m_timeToLive--;
-		if(m_timeToLive <= 0)
+
+		public void Draw(Canvas canvas) 
 		{
-			m_particles.clear();
+			canvas.drawRect(this.m_xLoc, this.m_yLoc, this.m_xLoc + this.m_width, this.m_yLoc + this.m_height, m_paint);
 		}
-	}
-	
-	public LinkedList<Particle> GetParticles()
-	{
-		return m_particles;
 	}
 }
